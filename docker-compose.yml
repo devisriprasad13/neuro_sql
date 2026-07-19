@@ -1,0 +1,156 @@
+version: "3.9"
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: neurosql_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-neurosql_db}
+      POSTGRES_USER: ${POSTGRES_USER:-neurosql}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurosql_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurosql} -d ${POSTGRES_DB:-neurosql_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - neurosql_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: neurosql_redis
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - neurosql_network
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: neurosql_api
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/home/neurosql/app/app
+      - ./backend/alembic:/home/neurosql/app/alembic
+      - ./backend/alembic.ini:/home/neurosql/app/alembic.ini
+      - ./backend/tests:/home/neurosql/app/tests
+      - ./backend/pytest.ini:/home/neurosql/app/pytest.ini
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - neurosql_network
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: neurosql_celery_worker
+    command: >
+      celery -A app.tasks.celery_app worker
+      --loglevel=info
+      --concurrency=${CELERY_WORKER_CONCURRENCY:-4}
+      --queues=default,query,schema
+    env_file:
+      - .env
+    volumes:
+      - ./backend/app:/home/neurosql/app/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - neurosql_network
+
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: neurosql_flower
+    command: >
+      celery -A app.tasks.celery_app flower
+      --port=5555
+      --broker=${CELERY_BROKER_URL:-redis://redis:6379/1}
+    env_file:
+      - .env
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - neurosql_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: neurosql_frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_APP_ENV=development
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - neurosql_network
+
+networks:
+  neurosql_network:
+    driver: bridge
+    name: neurosql_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

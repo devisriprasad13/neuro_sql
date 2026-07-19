@@ -1,0 +1,15 @@
+"""
+Async query tasks processed by Celery workers.
+Full implementation comes in Milestone 10.
+"""
+
+from app.tasks.celery_app import celery_app
+
+
+@celery_app.task(name="tasks.execute_query", bind=True)
+def execute_query_task(self, query: str, user_id: str, connection_ids: list):
+    """
+    Placeholder task for async query execution.
+    Fully implemented in Milestone 10.
+    """
+    return {"status": "pending", "query": query}

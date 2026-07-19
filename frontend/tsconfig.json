@@ -1,0 +1,116 @@
+{
+  "compilerOptions": {
+    /* ----------------------------------------------------------------
+       Language and Environment
+       ---------------------------------------------------------------- */
+
+    // Compile to modern JavaScript (ES2020+)
+    // Vite handles transpilation for older browsers separately
+    "target": "ES2020",
+
+    // Include browser type definitions (window, document, fetch, etc.)
+    // and modern JavaScript APIs
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+
+    // Tell TypeScript we are writing JSX (React components)
+    // 'react-jsx' uses the modern JSX transform — no need to
+    // import React at the top of every file
+    "jsx": "react-jsx",
+
+    /* ----------------------------------------------------------------
+       Module Resolution
+       ---------------------------------------------------------------- */
+
+    // Use modern ES module system
+    "module": "ESNext",
+
+    // How TypeScript resolves imports — 'bundler' mode is optimized
+    // for use with Vite and other modern bundlers
+    "moduleResolution": "bundler",
+
+    // Allow importing JSON files directly
+    "resolveJsonModule": true,
+
+    // Allow default imports from modules with no default export
+    // Required for some older CommonJS packages
+    "allowSyntheticDefaultImports": true,
+
+    // Allow importing ES modules from CommonJS modules
+    "esModuleInterop": true,
+
+    /* ----------------------------------------------------------------
+       Path Aliases
+       Must match the alias in vite.config.ts exactly
+       ---------------------------------------------------------------- */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    /* ----------------------------------------------------------------
+       Type Checking — Strict Mode
+       These settings catch entire categories of bugs at compile time.
+       Never disable these to silence errors — fix the errors instead.
+       ---------------------------------------------------------------- */
+
+    // Enable all strict type checking options
+    "strict": true,
+
+    // Error on expressions that imply 'any' type
+    "noImplicitAny": true,
+
+    // Error when accessing potentially undefined object properties
+    "strictNullChecks": true,
+
+    // Error on unused local variables (keeps code clean)
+    "noUnusedLocals": true,
+
+    // Error on unused function parameters
+    "noUnusedParameters": true,
+
+    // Error on switch statements missing a return in some branches
+    "noImplicitReturns": true,
+
+    /* ----------------------------------------------------------------
+       Output
+       ---------------------------------------------------------------- */
+
+    // Do not emit compiled JavaScript files
+    // Vite handles compilation — TypeScript is only used for type checking
+    "noEmit": true,
+
+    // Allow importing .ts files without specifying the extension
+    "allowImportingTsExtensions": true,
+
+    // Ensure consistent casing in file names across operating systems
+    // (Linux is case-sensitive, macOS/Windows are not — this prevents
+    // bugs that only appear on Linux in production)
+    "forceConsistentCasingInFileNames": true,
+
+    /* ----------------------------------------------------------------
+       Interop
+       ---------------------------------------------------------------- */
+
+    // Each file is treated as an isolated module
+    // Required for Vite's fast single-file transforms
+    "isolatedModules": true,
+
+    // Skip type checking of declaration files in node_modules
+    // Dramatically speeds up TypeScript compilation
+    "skipLibCheck": true
+  },
+
+  // Which files TypeScript should check
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "vite.config.ts"
+  ],
+
+  // Which files TypeScript should ignore
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build"
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "name": "neurosql-frontend",
+  "version": "1.0.0",
+  "description": "NeuroSQL — AI-powered database management platform frontend",
+  "private": true,
+  "type": "module",
+
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "type-check": "tsc --noEmit"
+  },
+
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.23.1",
+
+    "axios": "^1.7.2",
+    "@tanstack/react-query": "^5.40.0",
+    "@tanstack/react-query-devtools": "^5.40.0",
+
+    "tailwindcss": "^3.4.4",
+    "@headlessui/react": "^2.1.1",
+    "lucide-react": "^0.394.0",
+    "clsx": "^2.1.1",
+
+    "@monaco-editor/react": "^4.6.0",
+
+    "recharts": "^2.12.7",
+
+    "react-hot-toast": "^2.4.1",
+
+    "date-fns": "^3.6.0",
+
+    "zustand": "^4.5.2"
+  },
+
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/node": "^20.14.2",
+
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.3.1",
+
+    "typescript": "^5.4.5",
+
+    "eslint": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^7.13.0",
+    "@typescript-eslint/parser": "^7.13.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.7",
+
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/jest-dom": "^6.4.6",
+    "vitest": "^1.6.0"
+  },
+
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

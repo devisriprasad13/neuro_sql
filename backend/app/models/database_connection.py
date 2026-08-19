@@ -22,7 +22,7 @@ Table: database_connections
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -60,13 +60,11 @@ class DatabaseConnection(Base):
 
     # Ownership
     org_id: Mapped[uuid.UUID] = mapped_column(
-       UUID(as_uuid=True),
-       # ForeignKey references organizations table
-       # SET NULL: if org is deleted, keep connection record but orphan it
-       # In practice we use CASCADE at the org level
-       nullable=False,
-       index=True,
-       comment="Organization that owns this database connection.",
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Organization that owns this database connection.",
     )
 
     # Who registered this connection

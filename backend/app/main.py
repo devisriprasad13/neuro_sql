@@ -91,10 +91,33 @@ def create_application() -> FastAPI:
         prefix=settings.api_v1_prefix,
     )
 
-    # Future milestones will register:
-    # app.include_router(auth.router, prefix=settings.api_v1_prefix)
-    # app.include_router(connections.router, prefix=settings.api_v1_prefix)
-    # app.include_router(query.router, prefix=settings.api_v1_prefix)
+        # Query endpoints — Milestone 7
+    from app.api.v1 import query
+    app.include_router(
+        query.router,
+        prefix=settings.api_v1_prefix,
+        tags=["Query"],
+    )
+
+    # Connection management endpoints — Milestone 8
+    from app.api.v1 import connections
+    app.include_router(
+        connections.router,
+        prefix=settings.api_v1_prefix,
+        tags=["Connections"],
+    )
+    
+    # Auth endpoints — Milestone 13
+    from app.api.v1 import auth
+    app.include_router(
+        auth.router,
+        prefix=settings.api_v1_prefix,
+    )
+
+     # Future milestones will register:
+    # from app.api.v1 import auth, connections, admin, audit
+    # application.include_router(auth.router, prefix=settings.api_v1_prefix)
+    # application.include_router(connections.router, prefix=settings.api_v1_prefix)
 
     return app
 

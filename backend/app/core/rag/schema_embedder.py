@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 settings = get_settings()
 
 SCHEMA_NAMESPACE = "schema"
-UPSERT_BATCH_SIZE = 100
+UPSERT_BATCH_SIZE = 90
 
 
 def get_pinecone_index():

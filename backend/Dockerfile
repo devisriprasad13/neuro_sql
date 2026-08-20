@@ -1,143 +1,119 @@
 # ================================================================== #
-# NeuroSQL Backend — Dockerfile
+# NeuroSQL Backend — Multi-stage Dockerfile
 #
-# Multi-stage build:
-#   Stage 1 (builder): installs all dependencies with build tools
-#   Stage 2 (runtime): clean minimal image, copies compiled packages
+# Stage 1 (builder): Install all Python dependencies
+# Stage 2 (runtime): Minimal production image
 #
-# Result: ~200MB production image instead of 2GB+
+# Why multi-stage?
+#   Build tools (gcc, libpq-dev) are needed to compile C extensions
+#   but must NOT be in the production image — security and size.
+#   Builder: ~800MB. Runtime: ~200MB.
 # ================================================================== #
 
-
-# ================================================================== #
-# Stage 1 — Builder
-#
-# This stage has compilers and build tools.
-# It exists only to compile Python packages.
-# Nothing from this stage reaches production except /install.
-# ================================================================== #
+# ------------------------------------------------------------------ #
+# Stage 1: Builder — install Python packages with build tools
+# ------------------------------------------------------------------ #
 FROM python:3.12-slim AS builder
 
-# Set working directory for this stage
 WORKDIR /build
 
-# Install system build dependencies
-#   gcc       — C compiler required by asyncpg, cryptography
-#   libpq-dev — PostgreSQL client headers required by asyncpg
-#   libssl-dev — SSL headers required by cryptography package
-#
-# --no-install-recommends: skip suggested packages to keep image small
-# rm -rf /var/lib/apt/lists/*: delete apt cache after install
+# Install build tools needed to compile C extensions:
+#   gcc:       compiler for asyncpg, cryptography
+#   libpq-dev: PostgreSQL headers for psycopg2
+#   libssl-dev: OpenSSL headers for cryptography
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first — before copying any application code.
-#
-# Why? Docker layer caching.
-# Each line in a Dockerfile is a cached layer.
-# If requirements.txt hasn't changed, Docker skips pip install entirely.
-# If you copy source code first, any code change invalidates the pip layer
-# and forces a full reinstall of all packages — very slow.
 COPY requirements.txt .
 
-# Install all Python dependencies into /install
-#   --prefix=/install    — install to a specific directory (not system Python)
-#   --no-cache-dir       — don't cache downloads (saves ~100MB)
-#   --upgrade pip        — ensure latest pip is used
+# Install to /install so we can copy just the packages in stage 2
 RUN pip install --upgrade pip \
     && pip install \
         --prefix=/install \
         --no-cache-dir \
         -r requirements.txt
 
-
-# ================================================================== #
-# Stage 2 — Runtime
-#
-# Clean minimal image.
-# Only contains: Python runtime + compiled packages + application code.
-# No build tools, no compilers, no pip cache.
-# ================================================================== #
+# ------------------------------------------------------------------ #
+# Stage 2: Runtime — minimal production image
+# ------------------------------------------------------------------ #
 FROM python:3.12-slim AS runtime
 
-# Python environment variables
-#   PYTHONDONTWRITEBYTECODE=1 — don't write .pyc files (saves disk space)
-#   PYTHONUNBUFFERED=1        — flush stdout/stderr immediately (critical for logs)
-#   PYTHONPATH                — tells Python where to find our app module
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/home/neurosql/app
-
-# Install only runtime system libraries (not build tools)
-#   libpq5 — PostgreSQL client runtime library (asyncpg needs this at runtime)
+# Install only runtime libraries (not build tools):
+#   libpq5: PostgreSQL client library (runtime only, not dev headers)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# ------------------------------------------------------------------ #
-# Security: create and use a non-root user
-#
-# Running as root inside a container means if an attacker exploits
-# your application, they get root access to the container.
-# Running as a non-root user limits the blast radius.
-# ------------------------------------------------------------------ #
+# Create non-root user for security
+# Running as root inside containers is a security risk:
+# if the app is compromised, attacker has root inside the container
 RUN useradd \
     --create-home \
     --shell /bin/bash \
     --uid 1000 \
     neurosql
 
-# Set working directory to the app's home
 WORKDIR /home/neurosql/app
 
-# Copy compiled Python packages from builder stage
-# /install contains all packages installed by pip
+# Copy installed packages from builder stage
 COPY --from=builder /install /usr/local
 
-# Copy application source code
-# --chown: set file ownership to our non-root user
+# Copy application code with correct ownership
 COPY --chown=neurosql:neurosql app/ ./app/
 COPY --chown=neurosql:neurosql alembic/ ./alembic/
 COPY --chown=neurosql:neurosql alembic.ini ./alembic.ini
 
-# Switch to non-root user for all subsequent commands
-# and for the running container
+# Switch to non-root user
 USER neurosql
 
-# Document which port the application listens on
-# (does not actually publish the port — that's done in docker-compose.yml)
+# ------------------------------------------------------------------ #
+# Environment variables with production defaults
+# ------------------------------------------------------------------ #
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/home/neurosql/app \
+    PORT=8000 \
+    WORKERS=2
+
+# Expose the application port
 EXPOSE 8000
 
 # ------------------------------------------------------------------ #
 # Health check
-#
-# Docker will run this command every 30 seconds.
-# If it fails 3 times consecutively, Docker marks the container
-# as unhealthy and can restart it automatically.
+# Used by Docker Compose and container orchestrators to verify
+# the application is ready to receive traffic.
 # ------------------------------------------------------------------ #
-HEALTHCHECK \
-    --interval=30s \
-    --timeout=10s \
-    --start-period=40s \
-    --retries=3 \
-    CMD python -c "\
-import urllib.request; \
-urllib.request.urlopen('http://localhost:8000/api/v1/health')"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" \
+    || exit 1
 
 # ------------------------------------------------------------------ #
-# Start command
+# Startup command
 #
-# uvicorn: production ASGI server for FastAPI
-#   app.main:app     — import path to the FastAPI instance
-#   --host 0.0.0.0   — listen on all interfaces (required inside Docker)
-#   --port 8000      — port to listen on
-#   --reload         — restart on code changes (development only)
-#                      remove --reload in production
+# Development: uvicorn with --reload (in docker-compose.yml command)
+# Production:  gunicorn with multiple uvicorn workers
+#
+# Gunicorn manages worker processes:
+#   --workers 2:            2 worker processes (adjust per CPU count)
+#   UvicornWorker:          each worker is an async uvicorn instance
+#   --bind 0.0.0.0:8000:    listen on all interfaces
+#   --access-logfile -:     log to stdout (captured by Docker)
+#   --error-logfile -:      errors to stderr
+#   --log-level info:       production log level
+#   --timeout 120:          worker timeout (long for LLM calls)
+#   --graceful-timeout 30:  time to finish in-flight requests on shutdown
+#   --keep-alive 5:         keep-alive connections
 # ------------------------------------------------------------------ #
-CMD ["uvicorn", "app.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--reload"]
+CMD ["gunicorn", "app.main:app", \
+     "--workers", "2", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--bind", "0.0.0.0:8000", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--log-level", "info", \
+     "--timeout", "120", \
+     "--graceful-timeout", "30", \
+     "--keep-alive", "5"]

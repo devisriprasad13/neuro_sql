@@ -66,44 +66,39 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Create test environment file
+            - name: Set environment variables
         working-directory: backend
         run: |
-          cat > .env << 'EOF'
-          APP_NAME=NeuroSQL
-          APP_ENV=development
-          APP_DEBUG=true
-          SECRET_KEY=test-secret-key-for-ci-only-not-production-64chars-padding
-          API_V1_PREFIX=/api/v1
-          JWT_ALGORITHM=HS256
-          JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
-          JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
-          DATABASE_URL=postgresql+asyncpg://neurosql:test_password@localhost:5432/neurosql_test
-          POSTGRES_DB=neurosql_test
-          POSTGRES_USER=neurosql
-          POSTGRES_PASSWORD=test_password
-          REDIS_URL=redis://localhost:6379/0
-          CELERY_BROKER_URL=redis://localhost:6379/1
-          CELERY_RESULT_BACKEND=redis://localhost:6379/2
-          OPENAI_API_KEY=sk-test-key-not-real
-          OPENAI_MODEL=gpt-4o
-          OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-          PINECONE_API_KEY=test-pinecone-key-not-real
-          PINECONE_INDEX_NAME=neurosql-test
-          PINECONE_ENVIRONMENT=us-east-1
-          PINECONE_USE_HOSTED_EMBEDDING=true
-          CREDENTIAL_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-          DEFAULT_ORG_NAME=Test Organization
-          SUPER_ADMIN_EMAIL=admin@test.com
-          SUPER_ADMIN_PASSWORD=TestPassword123
-          CORS_ALLOWED_ORIGINS=http://localhost:5173
-          CELERY_WORKER_CONCURRENCY=2
-          GROQ_API_KEY=test-groq-key-not-real
-          GROQ_MODEL=llama-3.3-70b-versatile
-          EOF
+          echo "SECRET_KEY=test-secret-key-for-ci-only-not-production-64chars" >> $GITHUB_ENV
+          echo "DATABASE_URL=postgresql+asyncpg://neurosql:test_password@localhost:5432/neurosql_test" >> $GITHUB_ENV
+          echo "OPENAI_API_KEY=sk-test-not-real" >> $GITHUB_ENV
+          echo "PINECONE_API_KEY=test-pinecone-not-real" >> $GITHUB_ENV
+          echo "PINECONE_INDEX_NAME=neurosql-test" >> $GITHUB_ENV
+          echo "CREDENTIAL_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" >> $GITHUB_ENV
+          echo "SUPER_ADMIN_PASSWORD=TestPassword123" >> $GITHUB_ENV
+          echo "GROQ_API_KEY=test-groq-not-real" >> $GITHUB_ENV
+          echo "REDIS_URL=redis://localhost:6379/0" >> $GITHUB_ENV
+          echo "CELERY_BROKER_URL=redis://localhost:6379/1" >> $GITHUB_ENV
+          echo "CELERY_RESULT_BACKEND=redis://localhost:6379/2" >> $GITHUB_ENV
+          echo "PINECONE_ENVIRONMENT=us-east-1" >> $GITHUB_ENV
+          echo "PINECONE_USE_HOSTED_EMBEDDING=true" >> $GITHUB_ENV
 
       - name: Run unit tests
         working-directory: backend
+        env:
+          SECRET_KEY: test-secret-key-for-ci-only-not-production-64chars
+          DATABASE_URL: postgresql+asyncpg://neurosql:test_password@localhost:5432/neurosql_test
+          OPENAI_API_KEY: sk-test-not-real
+          PINECONE_API_KEY: test-pinecone-not-real
+          PINECONE_INDEX_NAME: neurosql-test
+          CREDENTIAL_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          SUPER_ADMIN_PASSWORD: TestPassword123
+          GROQ_API_KEY: test-groq-not-real
+          REDIS_URL: redis://localhost:6379/0
+          CELERY_BROKER_URL: redis://localhost:6379/1
+          CELERY_RESULT_BACKEND: redis://localhost:6379/2
+          PINECONE_ENVIRONMENT: us-east-1
+          PINECONE_USE_HOSTED_EMBEDDING: "true"
         run: |
           pytest tests/unit/ -v --tb=short --no-header \
             -p no:cacheprovider \

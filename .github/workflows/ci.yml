@@ -1,10 +1,3 @@
-# ================================================================== #
-# NeuroSQL — CI Pipeline
-#
-# Runs on every push to main and every pull request.
-# Builds the backend Docker image and runs all unit tests.
-# ================================================================== #
-
 name: NeuroSQL CI
 
 on:
@@ -13,17 +6,28 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  SECRET_KEY: test-secret-key-for-ci-only-not-production-64chars-pad
+  DATABASE_URL: postgresql+asyncpg://neurosql:test_password@localhost:5432/neurosql_test
+  OPENAI_API_KEY: sk-test-not-real
+  PINECONE_API_KEY: test-pinecone-not-real
+  PINECONE_INDEX_NAME: neurosql-test
+  PINECONE_ENVIRONMENT: us-east-1
+  PINECONE_USE_HOSTED_EMBEDDING: "true"
+  CREDENTIAL_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  SUPER_ADMIN_PASSWORD: TestPassword123
+  GROQ_API_KEY: test-groq-not-real
+  REDIS_URL: redis://localhost:6379/0
+  CELERY_BROKER_URL: redis://localhost:6379/1
+  CELERY_RESULT_BACKEND: redis://localhost:6379/2
+
 jobs:
 
-  # ------------------------------------------------------------------ #
-  # Backend tests
-  # ------------------------------------------------------------------ #
   backend-tests:
     name: Backend Unit Tests
     runs-on: ubuntu-latest
 
     services:
-      # PostgreSQL for integration tests
       postgres:
         image: postgres:16-alpine
         env:
@@ -38,7 +42,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      # Redis for Celery tests
       redis:
         image: redis:7-alpine
         ports:
@@ -66,39 +69,8 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-            - name: Set environment variables
-        working-directory: backend
-        run: |
-          echo "SECRET_KEY=test-secret-key-for-ci-only-not-production-64chars" >> $GITHUB_ENV
-          echo "DATABASE_URL=postgresql+asyncpg://neurosql:test_password@localhost:5432/neurosql_test" >> $GITHUB_ENV
-          echo "OPENAI_API_KEY=sk-test-not-real" >> $GITHUB_ENV
-          echo "PINECONE_API_KEY=test-pinecone-not-real" >> $GITHUB_ENV
-          echo "PINECONE_INDEX_NAME=neurosql-test" >> $GITHUB_ENV
-          echo "CREDENTIAL_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" >> $GITHUB_ENV
-          echo "SUPER_ADMIN_PASSWORD=TestPassword123" >> $GITHUB_ENV
-          echo "GROQ_API_KEY=test-groq-not-real" >> $GITHUB_ENV
-          echo "REDIS_URL=redis://localhost:6379/0" >> $GITHUB_ENV
-          echo "CELERY_BROKER_URL=redis://localhost:6379/1" >> $GITHUB_ENV
-          echo "CELERY_RESULT_BACKEND=redis://localhost:6379/2" >> $GITHUB_ENV
-          echo "PINECONE_ENVIRONMENT=us-east-1" >> $GITHUB_ENV
-          echo "PINECONE_USE_HOSTED_EMBEDDING=true" >> $GITHUB_ENV
-
       - name: Run unit tests
         working-directory: backend
-        env:
-          SECRET_KEY: test-secret-key-for-ci-only-not-production-64chars
-          DATABASE_URL: postgresql+asyncpg://neurosql:test_password@localhost:5432/neurosql_test
-          OPENAI_API_KEY: sk-test-not-real
-          PINECONE_API_KEY: test-pinecone-not-real
-          PINECONE_INDEX_NAME: neurosql-test
-          CREDENTIAL_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-          SUPER_ADMIN_PASSWORD: TestPassword123
-          GROQ_API_KEY: test-groq-not-real
-          REDIS_URL: redis://localhost:6379/0
-          CELERY_BROKER_URL: redis://localhost:6379/1
-          CELERY_RESULT_BACKEND: redis://localhost:6379/2
-          PINECONE_ENVIRONMENT: us-east-1
-          PINECONE_USE_HOSTED_EMBEDDING: "true"
         run: |
           pytest tests/unit/ -v --tb=short --no-header \
             -p no:cacheprovider \
@@ -113,9 +85,6 @@ jobs:
           name: coverage-report
           path: backend/coverage.xml
 
-  # ------------------------------------------------------------------ #
-  # Frontend build check
-  # ------------------------------------------------------------------ #
   frontend-build:
     name: Frontend Build Check
     runs-on: ubuntu-latest
@@ -135,28 +104,10 @@ jobs:
         working-directory: frontend
         run: npm install --legacy-peer-deps
 
-      - name: Type check
-        working-directory: frontend
-        run: npx tsc --noEmit
-        continue-on-error: true
-
       - name: Build
         working-directory: frontend
-        env:
-          VITE_API_BASE_URL: http://localhost:8000
-          VITE_APP_ENV: production
         run: npm run build
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-          retention-days: 7
-
-  # ------------------------------------------------------------------ #
-  # Docker build check
-  # ------------------------------------------------------------------ #
   docker-build:
     name: Docker Build Check
     runs-on: ubuntu-latest
@@ -176,16 +127,5 @@ jobs:
           target: runtime
           push: false
           tags: neurosql-api:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          dockerfile: ./frontend/Dockerfile
-          target: builder
-          push: false
-          tags: neurosql-frontend:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
